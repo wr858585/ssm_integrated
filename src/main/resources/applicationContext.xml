@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd http://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!--1.包扫描，去除springmvc.xml中已扫描的@Controller和@ControllerAdvice注解-->
+    <context:component-scan base-package="com" >
+        <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+        <context:exclude-filter type="annotation" expression="org.springframework.web.bind.annotation.ControllerAdvice"/>
+    </context:component-scan>
+
+    <!--2a.占位标签，给jdbc.properties中的占位提供可能-->
+    <context:property-placeholder location="classpath:jdbc.properties"/>
+
+    <!--2b.配置数据库连接池-->
+    <bean class="com.alibaba.druid.pool.DruidDataSource" id="dataSource">
+        <property name="username" value="${user}"/>
+        <property name="password" value="${password}"/>
+        <property name="url" value="${url}"/>
+        <property name="driverClassName" value="${driverClassName}"/>
+        <property name="initialSize" value="${initialSize}"/>
+        <property name="maxActive" value="${maxActive}"/>
+    </bean>
+
+    <!--3a.配置数据源事务管理器-->
+    <bean class="org.springframework.jdbc.datasource.DataSourceTransactionManager" id="dataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!--3b.开启事务注解驱动-->
+    <tx:annotation-driven transaction-manager="dataSourceTransactionManager"/>
+
+    <!--之后，spring还需要整合mybatis两个地方-->
+
+    <!--4.配置SqlSessionFactoryBean对象-->
+    <bean class="org.mybatis.spring.SqlSessionFactoryBean" id="sqlSessionFactory">
+        <!--配置dataSource属性-->
+        <property name="dataSource" ref="dataSource"/>
+        <!--配置MyBatis核心配置文件-->
+        <property name="configLocation" value="classpath:mybatis-config.xml"/>
+        <!--配置加载Mapper.xml文件-->
+<!--        <property name="mapperLocations" value="classpath:com/atguigu/mapper/*.xml"/>-->
+    </bean>
+
+    <!--5.用MapperScannerConfigurer，配置扫描mapper接口的bean对象-->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer" id="configurer">
+        <property name="basePackage" value="com.atguigu.dao"/>
+    </bean>
+
+    <!--下面的配置为<可选>-->
+
+    <!--事务属性-->
+    <!--这里的id可以随便取-->
+    <tx:advice id="tx_advice" transaction-manager="dataSourceTransactionManager">
+        <tx:attributes>
+            <tx:method name="save*" propagation="REQUIRED"/>
+            <tx:method name="delete*" propagation="REQUIRED"/>
+            <tx:method name="update*" propagation="REQUIRED"/>
+            <tx:method name="insert*" propagation="REQUIRED"/>
+            <!--设置read-only可以提升一定性能在底层-->
+            <tx:method name="*" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <!--代理-->
+    <aop:config>
+        <aop:advisor advice-ref="tx_advice" pointcut="execution(public * com.atguigu..*Service*.*(..))"/>
+    </aop:config>
+
+</beans>
